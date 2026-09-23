@@ -1663,8 +1663,11 @@ def asof_line(s, roots, html):
         return None
     drift, total = slice_drift(s, roots)
     bits = []
-    if s.get("git_head"):
-        bits.append(f"as of {s['git_head'][:7]}")
+    head = s.get("git_head")
+    if isinstance(head, dict):
+        bits.append("as of " + ", ".join(f"{a} {h[:7]}" for a, h in head.items() if h))
+    elif head:
+        bits.append(f"as of {head[:7]}")
     if s.get("updated"):
         bits.append(str(s["updated"])[:10])
     bits.append(f"{drift} of {total} files changed since" if drift else f"{total} files, none changed since")
