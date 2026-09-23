@@ -21,5 +21,5 @@ picker opens a local browser page.
 
 ## Versions
 
-See `git tag`. Forks for a specific codebase (e.g. `biddaan-field-guide`) live in that project's
-`.claude/skills/` and backport anything generally useful here.
+See `git tag`. A fork tuned to one codebase lives in that project's `.claude/skills/` under its own name, and
+backports anything generally useful here.
