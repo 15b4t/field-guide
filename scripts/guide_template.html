@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf7;--fg:#1f1d1a;--muted:#6b665e;--rule:#e4e0d8;--code:#f1eee7;--accent:#b4532a;--panel:#fffefb;
+--assume:#fdf1e7;--assume-b:#d9822b;--analogy:#eef4fb;--analogy-b:#4a7fb5;--fact:#eef7ef;--fact-b:#3f8f4f;
+--bug:#fbeeee;--bug-b:#b54a4a;--open:#f6f0fb;--open-b:#8a5cb5;--recap:#f4f2ec;--recap-b:#1f1d1a;--shade:rgba(20,18,16,.72)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17161a;--fg:#e8e5df;--muted:#a19c93;--rule:#2e2c31;--code:#232128;--accent:#e08a5f;--panel:#1d1c21;
+--assume:#2a2118;--analogy:#18212b;--fact:#172419;--bug:#2a1818;--open:#231a2b;--recap:#211f24;--recap-b:#e8e5df;--shade:rgba(0,0,0,.8)}}
+*{box-sizing:border-box}
+html{scroll-padding-top:16px}
+body{background:var(--bg);color:var(--fg);font:18px/1.65 "Source Serif 4",Georgia,serif;margin:0}
+.layout{display:grid;grid-template-columns:260px minmax(0,760px);gap:48px;justify-content:center;padding:0 16px}
+:root[data-nav="hidden"] .layout{grid-template-columns:minmax(0,760px)}
+:root[data-nav="hidden"] #toc{display:none}
+main{padding:48px 0 120px;min-width:0}
+h1{font-size:2.2em;line-height:1.15;margin:.2em 0 .4em}
+h2{margin-top:2.4em;padding-top:.6em;border-top:1px solid var(--rule);line-height:1.25}
+h3{margin-top:1.8em}
+a{color:var(--accent)}
+code,pre{font-family:"JetBrains Mono",monospace;font-size:.82em;background:var(--code);border-radius:4px}
+code{padding:.1em .3em}pre{padding:14px 16px;overflow-x:auto;line-height:1.45}pre code{background:none;padding:0}
+blockquote{margin:1.4em 0;padding:.8em 1.1em;border-left:4px solid var(--rule);background:var(--recap);border-radius:0 6px 6px 0}
+blockquote p{margin:.3em 0}
+blockquote.assume{background:var(--assume);border-color:var(--assume-b)}
+blockquote.analogy{background:var(--analogy);border-color:var(--analogy-b)}
+blockquote.fact{background:var(--fact);border-color:var(--fact-b)}
+blockquote.bug{background:var(--bug);border-color:var(--bug-b)}
+blockquote.open{background:var(--open);border-color:var(--open-b)}
+blockquote.recap{background:var(--recap);border-color:var(--recap-b)}
+table{border-collapse:collapse;width:100%;font-size:.9em;display:block;overflow-x:auto}
+th,td{border-bottom:1px solid var(--rule);padding:6px 10px;text-align:left;vertical-align:top}
+.meta{color:var(--muted);font-size:.9em}
+.asof{color:var(--muted);font:11px/1.5 "JetBrains Mono",monospace;letter-spacing:.04em;text-transform:uppercase;margin:-.4em 0 1.6em}
+.asof.drifted{color:var(--open-b)}
+.asof.drifted::before{content:"\25CF  "}
+img{max-width:100%}
+
+/* contents sidebar */
+#toc{align-self:start;padding-top:48px;font-size:14px;line-height:1.35}
+#toc summary{font-family:"JetBrains Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer;list-style:none;padding:6px 0}
+#toc summary::-webkit-details-marker{display:none}
+#toc summary::before{content:"\2630  ";color:var(--accent)}
+#toc nav{border-left:1px solid var(--rule);padding:4px 0 40px 12px;margin-top:6px}
+#find{width:100%;font:12px "JetBrains Mono",monospace;background:var(--panel);color:var(--fg);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;margin:4px 0 2px}
+#find:focus{outline:none;border-color:var(--accent)}
+#find-count{font:10px "JetBrains Mono",monospace;color:var(--muted);letter-spacing:.06em;padding:2px 0;min-height:14px}
+#toc nav.filtered a.sec{display:block}
+#toc nav.filtered .hit{color:var(--accent)}
+#toc nav a.off,#toc nav .grp.off{display:none}
+#toc a{display:block;text-decoration:none;color:var(--muted);padding:3px 0}
+#toc a:hover{color:var(--accent)}
+#toc .grp{font-family:"JetBrains Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 4px}
+#toc .grp:first-child{margin-top:0}
+#toc a.ch{color:var(--fg);font-weight:600;margin-top:6px}
+#toc a.sec{padding-left:14px;font-size:13px;display:none}
+#toc .open a.sec{display:block}
+#toc a.here{color:var(--accent)}
+#toc a.ch.here{border-left:2px solid var(--accent);margin-left:-13px;padding-left:11px}
+@media (min-width:1000px){#toc{position:sticky;top:0;max-height:100vh;overflow-y:auto;scrollbar-width:thin}}
+@media (max-width:999px){
+  .layout{grid-template-columns:minmax(0,1fr);gap:0}
+  #toc{padding-top:16px}
+  #toc nav{max-height:55vh;overflow-y:auto}
+  main{padding-top:16px}
+}
+.chrome{position:fixed;right:14px;bottom:14px;display:flex;gap:6px;z-index:5}
+.chrome button{font:12px "JetBrains Mono",monospace;background:var(--panel);color:var(--muted);border:1px solid var(--rule);border-radius:6px;padding:6px 9px;cursor:pointer}
+.chrome button:hover{color:var(--accent);border-color:var(--accent)}
+@media (max-width:999px){#nav-toggle{display:none}}
+
+/* diagrams: inline zoom and a full-screen viewer */
+.fig{position:relative;margin:1.4em 0;border:1px solid var(--rule);border-radius:8px;background:var(--panel);overflow:hidden}
+.fig .stage{overflow:hidden;touch-action:pan-y;padding:12px;text-align:center}
+.fig .stage.zoomed{cursor:grab}
+.fig .stage > pre.mermaid{display:block}
+.fig .stage.dragging{cursor:grabbing}
+.fig .stage > *{transform-origin:0 0;display:inline-block}
+.fig pre.mermaid{background:none;margin:0;padding:0}
+.fig .tools{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:.55;transition:opacity .15s}
+.fig:hover .tools,.fig:focus-within .tools{opacity:1}
+.tools button{font:13px/1 "JetBrains Mono",monospace;width:28px;height:28px;background:var(--bg);color:var(--fg);border:1px solid var(--rule);border-radius:6px;cursor:pointer}
+.tools button:hover{border-color:var(--accent);color:var(--accent)}
+.fig .hint{position:absolute;left:10px;bottom:6px;font:11px "JetBrains Mono",monospace;color:var(--muted);opacity:0;transition:opacity .15s;pointer-events:none}
+.fig:hover .hint{opacity:1}
+#viewer{position:fixed;inset:0;background:var(--shade);display:none;z-index:20}
+#viewer.on{display:block}
+#viewer .stage{position:absolute;inset:48px 16px 16px;background:var(--panel);border-radius:10px;overflow:hidden;cursor:grab;touch-action:none}
+#viewer .stage.dragging{cursor:grabbing}
+#viewer .stage > *{transform-origin:0 0;position:absolute;left:0;top:0}
+#viewer .tools{position:absolute;top:10px;right:16px;display:flex;gap:6px}
+#viewer .hint{position:absolute;top:16px;left:16px;font:12px "JetBrains Mono",monospace;color:#ddd}
+@media print{#toc,.chrome,.fig .tools,.fig .hint{display:none}.layout{grid-template-columns:1fr}}
+</style></head>
+<body>
+<div class="layout">
+  <details id="toc" open><summary>Contents</summary>
+    <input id="find" type="search" placeholder="find a term…" autocomplete="off" aria-label="Search the guide">
+    <div id="find-count" aria-live="polite"></div>
+    <nav aria-label="Contents"></nav></details>
+  <main id="doc">Loading…</main>
+</div>
+<div class="chrome"><button id="nav-toggle" title="Show or hide contents">contents</button><button id="to-top" title="Back to top">top</button></div>
+<div id="viewer" role="dialog" aria-modal="true" aria-label="Diagram viewer">
+  <div class="hint">scroll to zoom · drag to pan · Esc to close</div>
+  <div class="tools"><button data-z="in" title="Zoom in">+</button><button data-z="out" title="Zoom out">&minus;</button><button data-z="fit" title="Fit">&#9635;</button><button data-z="close" title="Close">&times;</button></div>
+  <div class="stage"></div>
+</div>
+<script type="text/markdown" id="src">__MARKDOWN__</script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+<script>
+(async function () {
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  };
+  const md = document.getElementById('src').textContent.split('<\\/script>').join('</' + 'script>');
+  const doc = document.getElementById('doc');
+  doc.innerHTML = marked.parse(md, { gfm: true });
+
+  // callouts, styled by their bold label
+  const kinds = [[/^(non-obvious|you might assume)/i, 'assume'], [/^think of it like/i, 'analogy'],
+    [/^(real numbers|by the numbers)/i, 'fact'], [/^(history|a real bug|real bug)/i, 'bug'],
+    [/^still open/i, 'open'], [/^(in short|say it out loud)/i, 'recap']];
+  doc.querySelectorAll('blockquote').forEach(b => {
+    const s = b.querySelector('strong'); if (!s) return;
+    const t = s.textContent.trim();
+    for (const [r, k] of kinds) { if (r.test(t)) { b.classList.add(k); break; } }
+  });
+
+  // ids for headings (GitHub-style, deduplicated)
+  const used = {};
+  doc.querySelectorAll('h2,h3').forEach(h => {
+    let id = h.id || h.textContent.toLowerCase().trim().replace(/[^a-z0-9 -]/g, '').replace(/ /g, '-');  // same rule as fg.py's anchor() and GitHub
+    if (used[id]) id += '-' + used[id]++; else used[id] = 1;
+    h.id = id;
+  });
+
+  // contents: every h2, with its h3s shown under the chapter being read
+  const nav = document.querySelector('#toc nav');
+  const groups = [];
+  let cur = null;
+  doc.querySelectorAll('h2,h3,.part').forEach(h => {
+    if (h.classList.contains('part')) {
+      const g = document.createElement('div'); g.className = 'grp'; g.textContent = h.dataset.part;
+      nav.appendChild(g); cur = null; return;
+    }
+    const a = document.createElement('a');
+    a.href = '#' + h.id; a.textContent = h.textContent;
+    if (h.tagName === 'H2') {
+      cur = document.createElement('div'); a.className = 'ch'; cur.appendChild(a); nav.appendChild(cur);
+      groups.push({ h, a, box: cur, subs: [] });
+    } else if (cur) {
+      a.className = 'sec'; cur.appendChild(a); groups[groups.length - 1].subs.push({ h, a });
+    }
+  });
+  const toc = document.getElementById('toc');
+  if (matchMedia('(max-width: 999px)').matches) toc.removeAttribute('open');
+  nav.addEventListener('click', e => { if (e.target.tagName === 'A' && matchMedia('(max-width: 999px)').matches) toc.removeAttribute('open'); });
+
+  // find: filter the contents by heading or section text. You arrive with a term, not a chapter number.
+  const sectionText = h => {
+    let t = h.textContent.toLowerCase(), n = h.nextElementSibling;
+    while (n && !/^H[23]$/.test(n.tagName)) { t += ' ' + n.textContent.toLowerCase(); n = n.nextElementSibling; }
+    return t;
+  };
+  const entries = [];
+  groups.forEach(g => {
+    entries.push({ a: g.a, text: sectionText(g.h), group: g });
+    g.subs.forEach(s => entries.push({ a: s.a, text: sectionText(s.h), group: g }));
+  });
+  const find = document.getElementById('find'), count = document.getElementById('find-count');
+  function runFind() {
+    const q = find.value.trim().toLowerCase();
+    const grps = nav.querySelectorAll('.grp');
+    if (!q) {
+      nav.classList.remove('filtered');
+      entries.forEach(e => e.a.classList.remove('off', 'hit'));
+      grps.forEach(g => g.classList.remove('off'));
+      count.textContent = '';
+      return;
+    }
+    nav.classList.add('filtered');
+    grps.forEach(g => g.classList.add('off'));
+    let n = 0; const live = new Set();
+    entries.forEach(e => {
+      const hit = e.text.includes(q);
+      e.a.classList.toggle('off', !hit);
+      e.a.classList.toggle('hit', hit);
+      if (hit) { n++; live.add(e.group); }
+    });
+    live.forEach(g => g.a.classList.remove('off'));  // keep the chapter line when only its sections matched
+    count.textContent = n ? n + (n === 1 ? ' match' : ' matches') : 'no match';
+  }
+  find.addEventListener('input', runFind);
+  find.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { find.value = ''; runFind(); }
+    if (e.key === 'Enter') { const first = nav.querySelector('a:not(.off)'); if (first) first.click(); }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === '/' && document.activeElement !== find) { e.preventDefault(); find.focus(); }
+  });
+  let ticking = false;
+  function spy() {
+    ticking = false;
+    const y = window.scrollY + 80;
+    let g = null, s = null;
+    for (const gr of groups) { if (gr.h.offsetTop <= y) g = gr; }
+    if (g) for (const sub of g.subs) { if (sub.h.offsetTop <= y) s = sub; }
+    nav.querySelectorAll('.here').forEach(x => x.classList.remove('here'));
+    nav.querySelectorAll('.open').forEach(x => x.classList.remove('open'));
+    if (g) { g.a.classList.add('here'); g.box.classList.add('open'); }
+    if (s) s.a.classList.add('here');
+  }
+  window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(spy); } }, { passive: true });
+
+  const root = document.documentElement;
+  if (store.get('fg-nav') === 'hidden') root.dataset.nav = 'hidden';
+  document.getElementById('nav-toggle').onclick = () => {
+    const hide = root.dataset.nav !== 'hidden';
+    if (hide) root.dataset.nav = 'hidden'; else delete root.dataset.nav;
+    store.set('fg-nav', hide ? 'hidden' : 'shown');
+  };
+  document.getElementById('to-top').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  // mermaid
+  doc.querySelectorAll('pre code.language-mermaid').forEach(c => {
+    const p = document.createElement('pre'); p.className = 'mermaid'; p.textContent = c.textContent;
+    c.parentElement.replaceWith(p);
+  });
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'neutral', securityLevel: 'strict' });
+  try { await mermaid.run({ querySelector: 'pre.mermaid' }); } catch (e) { console.warn(e); }
+
+  // pan/zoom: one small controller used both inline and in the full-screen viewer
+  function panZoom(stage, el, opts) {
+    const st = { k: 1, x: 0, y: 0 };
+    const apply = () => {
+      el.style.transform = `translate(${st.x}px, ${st.y}px) scale(${st.k})`;
+      stage.classList.toggle('zoomed', st.k !== 1 || st.x !== 0 || st.y !== 0);
+    };
+    function zoomAt(f, cx, cy) {
+      const k = Math.min(8, Math.max(0.2, st.k * f));
+      st.x = cx - (cx - st.x) * (k / st.k); st.y = cy - (cy - st.y) * (k / st.k); st.k = k; apply();
+    }
+    function center(f) { const r = stage.getBoundingClientRect(); zoomAt(f, r.width / 2, r.height / 2); }
+    function fit() {
+      if (opts.fit) { opts.fit(st); apply(); return; }
+      st.k = 1; st.x = 0; st.y = 0; apply();
+    }
+    stage.addEventListener('wheel', e => {
+      if (opts.wheelNeedsModifier && !(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      const r = stage.getBoundingClientRect();
+      zoomAt(Math.exp(-e.deltaY * 0.0015), e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+    let drag = null;
+    stage.addEventListener('pointerdown', e => {
+      // inline diagrams only pan once zoomed, so a plain click or swipe still behaves like the page
+      if (e.button !== 0 || (opts.dragOnlyWhenZoomed && st.k === 1 && !st.x && !st.y)) return;
+      drag = { x: e.clientX - st.x, y: e.clientY - st.y }; stage.setPointerCapture(e.pointerId); stage.classList.add('dragging');
+    });
+    stage.addEventListener('pointermove', e => { if (!drag) return; st.x = e.clientX - drag.x; st.y = e.clientY - drag.y; apply(); });
+    const end = () => { drag = null; stage.classList.remove('dragging'); };
+    stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
+    stage.addEventListener('dblclick', () => fit());
+    return { in: () => center(1.25), out: () => center(0.8), fit };
+  }
+
+  const viewer = document.getElementById('viewer');
+  const vstage = viewer.querySelector('.stage');
+  let vctl = null;
+  function openViewer(node) {
+    vstage.innerHTML = '';
+    const clone = node.cloneNode(true);
+    clone.removeAttribute('style');
+    if (clone.tagName.toLowerCase() === 'svg') { clone.style.maxWidth = 'none'; }
+    vstage.appendChild(clone);
+    viewer.classList.add('on');
+    vctl = panZoom(vstage, clone, {
+      fit(st) {
+        clone.style.transform = 'none';
+        const r = vstage.getBoundingClientRect(), b = clone.getBoundingClientRect();
+        const k = Math.min((r.width - 48) / b.width, (r.height - 48) / b.height, 4);
+        st.k = k; st.x = (r.width - b.width * k) / 2; st.y = (r.height - b.height * k) / 2;
+      }
+    });
+    requestAnimationFrame(() => vctl.fit());
+    viewer.querySelector('[data-z="close"]').focus();
+  }
+  function closeViewer() { viewer.classList.remove('on'); vstage.innerHTML = ''; vctl = null; }
+  viewer.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
+    const z = b.dataset.z; if (z === 'close') return closeViewer(); if (vctl) vctl[z]();
+  });
+  viewer.addEventListener('click', e => { if (e.target === viewer) closeViewer(); });
+  document.addEventListener('keydown', e => {
+    if (!viewer.classList.contains('on')) return;
+    if (e.key === 'Escape') closeViewer();
+    else if (e.key === '+' || e.key === '=') vctl && vctl.in();
+    else if (e.key === '-') vctl && vctl.out();
+    else if (e.key === '0') vctl && vctl.fit();
+  });
+
+  // wrap every rendered diagram and every image
+  const targets = [...doc.querySelectorAll('pre.mermaid')].filter(p => p.querySelector('svg'))
+    .concat([...doc.querySelectorAll('img')]);
+  targets.forEach(t => {
+    const fig = document.createElement('div'); fig.className = 'fig';
+    const stage = document.createElement('div'); stage.className = 'stage';
+    t.replaceWith(fig); fig.appendChild(stage); stage.appendChild(t);
+    const tools = document.createElement('div'); tools.className = 'tools';
+    tools.innerHTML = '<button data-z="in" title="Zoom in">+</button><button data-z="out" title="Zoom out">&minus;</button>' +
+      '<button data-z="fit" title="Reset">&#8634;</button><button data-z="full" title="Open full screen">&#10530;</button>';
+    fig.appendChild(tools);
+    const hint = document.createElement('div'); hint.className = 'hint';
+    hint.textContent = 'ctrl/\u2318 + scroll or +/\u2212 to zoom \u00b7 drag to pan \u00b7 \u2922 full screen';
+    fig.appendChild(hint);
+    const ctl = panZoom(stage, t, { wheelNeedsModifier: true, dragOnlyWhenZoomed: true });
+    tools.querySelectorAll('button').forEach(b => b.onclick = () => {
+      const z = b.dataset.z;
+      if (z === 'full') openViewer(t.tagName === 'IMG' ? t : (t.querySelector('svg') || t)); else ctl[z]();
+    });
+  });
+
+  spy();
+  if (location.hash) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); }
+})();
+</script>
+</body></html>

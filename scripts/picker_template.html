@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field guide picker</title>
+<style>
+:root{--bg:#fbfaf7;--fg:#1f1d1a;--muted:#6b665e;--rule:#e4e0d8;--panel:#fffefb;--hover:#f4f1ea;--accent:#b4532a;--accent-fg:#fff;
+--ok:#3f8f4f;--ok-bg:#eef7ef;--warn:#b5651d;--warn-bg:#fdf1e7;--bad:#b54a4a;--chip:#f1eee7}
+@media (prefers-color-scheme:dark){:root{--bg:#17161a;--fg:#e8e5df;--muted:#a19c93;--rule:#2e2c31;--panel:#1d1c21;--hover:#25232a;--accent:#e08a5f;--accent-fg:#17161a;
+--ok:#7cc48a;--ok-bg:#172419;--warn:#e0a060;--warn-bg:#2a2118;--bad:#e07a7a;--chip:#26242b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+.mono{font-family:ui-monospace,"JetBrains Mono",Menlo,monospace}
+header{padding:20px 16px 8px;max-width:1040px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px}
+.bar{position:sticky;top:0;z-index:3;background:var(--bg);border-bottom:1px solid var(--rule)}
+.bar .in{max-width:1040px;margin:0 auto;padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=search]{flex:1 1 220px;min-width:0;padding:7px 10px;border:1px solid var(--rule);border-radius:8px;background:var(--panel);color:var(--fg);font:inherit}
+button{font:inherit;font-size:13px;padding:6px 11px;border-radius:8px;border:1px solid var(--rule);background:var(--panel);color:var(--fg);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+main{max-width:1040px;margin:0 auto;padding:8px 16px 180px}
+.grp{font:600 11px ui-monospace,Menlo,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.row{display:grid;grid-template-columns:28px 44px minmax(0,1fr) auto;gap:10px;align-items:start;padding:10px 12px;border:1px solid var(--rule);border-radius:10px;background:var(--panel);margin-bottom:8px;cursor:pointer}
+.row:hover{background:var(--hover)}
+.row.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.row.done{opacity:.62;cursor:default}
+.row.skipped{opacity:.45}
+.row input{width:18px;height:18px;margin-top:2px;accent-color:var(--accent)}
+.id{font:600 13px ui-monospace,Menlo,monospace;color:var(--muted);padding-top:2px}
+.t{font-weight:600}
+.q{color:var(--muted);font-size:13.5px;margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.chip{font:11px ui-monospace,Menlo,monospace;background:var(--chip);border-radius:5px;padding:2px 6px;color:var(--muted)}
+.chip.f{color:var(--accent)}
+.chip.need{background:var(--warn-bg);color:var(--warn)}
+.chip.ready{background:var(--ok-bg);color:var(--ok)}
+.more{display:none;font-size:13px;color:var(--muted);margin-top:6px}
+.row.open .more{display:block}
+.side{text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
+.side .st{font:600 11px ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.05em}
+.st.done{color:var(--ok)}.st.researched{color:var(--accent)}.st.skipped{color:var(--bad)}
+.skip{margin-top:6px;font-size:11px;padding:2px 7px}
+.foot{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--panel);border-top:1px solid var(--rule);box-shadow:0 -6px 18px rgba(0,0,0,.06)}
+.foot .in{max-width:1040px;margin:0 auto;padding:12px 16px;display:grid;gap:10px}
+.sum{display:flex;gap:16px;flex-wrap:wrap;align-items:baseline}
+.sum b{font-size:18px}
+.warn{color:var(--warn);font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg label{padding:6px 10px;font-size:13px;cursor:pointer;border-right:1px solid var(--rule)}
+.seg label:last-child{border-right:0}
+.seg input{display:none}
+.seg input:checked+span{color:var(--accent);font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.vol{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;padding:12px;border:1px solid var(--rule);border-radius:10px;background:var(--panel);margin-bottom:8px;cursor:pointer}
+.vol:hover{background:var(--hover)}
+.vol.on{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.vol.card{grid-template-columns:minmax(0,1fr) auto;cursor:default}
+.vol.card:hover{background:var(--panel)}
+.paths{font:12px ui-monospace,Menlo,monospace;color:var(--muted);margin-top:6px;word-break:break-all}
+details.nc{margin-top:24px;color:var(--muted);font-size:13px}
+.doneview{max-width:560px;margin:18vh auto;text-align:center;padding:0 16px}
+.doneview h2{margin:0 0 8px}
+@media (max-width:640px){.row{grid-template-columns:24px minmax(0,1fr)}.row .id{display:none}.row .side{grid-column:2;text-align:left}}
+</style></head>
+<body>
+<div id="app"><div class="doneview">Loading…</div></div>
+<script>
+(async function () {
+  const TOKEN = '__TOKEN__';
+  const api = p => `/${TOKEN}/api/${p}`;
+  const app = document.getElementById('app');
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const k = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : Math.round(n / 1000) + 'k';
+  let data;
+  try { data = await (await fetch(api('plan'))).json(); }
+  catch (e) { app.innerHTML = '<div class="doneview"><h2>Picker not reachable</h2><p>The fg.py process may have exited.</p></div>'; return; }
+
+  async function submit(payload, message) {
+    const r = await fetch(api('submit'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!r.ok) { alert('Could not save: ' + (await r.text())); return; }
+    app.innerHTML = `<div class="doneview"><h2>${esc(message)}</h2><p class="sub">Claude has your choice and is continuing in the terminal. You can close this tab.</p></div>`;
+  }
+
+  const header = (title, sub) => `<header><h1>${esc(title)}</h1><div class="sub">${sub}</div></header>`;
+
+  if (data.mode === 'volumes') return renderVolumes();
+  renderSlices();
+
+  function renderVolumes() {
+    let pick = null;
+    app.innerHTML = header(data.title, `This codebase is too large for one guide. Pick the volume to plan first. <span class="mono">${esc(data.workspace)}</span>`) +
+      `<main>${data.volumes.map(v => `
+        <div class="vol" data-id="${esc(v.id)}"><input type="radio" name="v">
+          <div><div class="t">${esc(v.id)}. ${esc(v.title)}</div><div class="q">${esc(v.summary)}</div>
+          <div class="paths">${(v.paths || []).map(esc).join(' · ')}</div></div>
+          <div class="side">${v.lines ? Number(v.lines).toLocaleString() + ' lines' : ''}</div></div>`).join('')}
+      </main>
+      <div class="foot"><div class="in"><div class="actions">
+        
+        <div><button id="cancel">Cancel</button> <button class="primary" id="go" disabled>Plan this volume</button></div>
+      </div></div></div>`;
+    app.querySelectorAll('.vol').forEach(el => el.onclick = () => {
+      app.querySelectorAll('.vol').forEach(x => x.classList.remove('on'));
+      el.classList.add('on'); el.querySelector('input').checked = true; pick = el.dataset.id;
+      document.getElementById('go').disabled = false;
+    });
+    document.getElementById('cancel').onclick = () => submit({ action: 'cancel' }, 'Cancelled');
+    document.getElementById('go').onclick = () => {
+      const v = data.volumes.find(x => String(x.id) === pick);
+      submit({ action: 'volume', volume: v.id, title: v.title, paths: v.paths,
+        }, `Volume ${v.id} chosen`);
+    };
+  }
+
+  function renderSlices() {
+    const byId = Object.fromEntries(data.slices.map(s => [s.id, s]));
+    const open = s => !['done'].includes(s.status);
+    const sel = new Set(data.slices.filter(s => ['selected', 'researched', 'written'].includes(s.status)).map(s => s.id));
+    const skip = new Set(data.slices.filter(s => s.status === 'skipped').map(s => s.id));
+    const doneIds = new Set(data.slices.filter(s => s.status === 'done').map(s => s.id));
+    const counts = {};
+    data.slices.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
+    const summary = Object.entries(counts).map(([a, b]) => `${b} ${a}`).join(' · ');
+
+    app.innerHTML = header(data.title,
+      `<span class="mono">${esc(data.workspace)}</span> · depth ${esc(data.depth)} · research on ${esc(data.models.research)}, writing on ${esc(data.models.writer)} · ${summary}`) +
+      `<div class="bar"><div class="in">
+        <input type="search" id="q" placeholder="Filter by title, question, type, id…">
+        <button data-q="found">Foundations</button><button data-q="open">All unfinished</button><button data-q="none">None</button>
+        <button id="expand">Show details</button>
+      </div></div>
+      <main id="list"></main>
+      <div class="foot"><div class="in">
+        <div class="sum"><span><b id="n">0</b> selected</span><span>≈ <b id="cost">0</b> tokens</span><span class="sub" id="split"></span></div>
+        <div class="warn" id="warn"></div>
+        <div class="actions">
+          <div class="seg">
+            <label><input type="radio" name="run" value="one" checked><span>Run the next one</span></label>
+            <label><input type="radio" name="run" value="three"><span>Next 3</span></label>
+            <label><input type="radio" name="run" value="all"><span>All selected</span></label>
+            <label><input type="radio" name="run" value="none"><span>Just save</span></label>
+          </div>
+          <div><button id="cancel">Cancel</button> <button class="primary" id="go">Confirm</button></div>
+        </div>
+      </div></div>`;
+
+    const list = document.getElementById('list');
+    const dr = app.querySelector(`input[name=run][value="${data.default_run || 'one'}"]`); if (dr) dr.checked = true;
+    let expanded = false;
+    const openVols = (data.volumes || []).filter(v => v.state === 'open');
+    // Every volume's chapters share one plan, so a single confirm can mix chapters from several.
+    const volById = Object.fromEntries((data.volumes || []).map(v => [String(v.id), v]));
+    const volOf = s => s.volume ? String(s.volume) : '';
+    const multiVol = new Set(data.slices.map(volOf)).size > 1;
+    const volTitle = v => { const x = volById[v]; return !v ? 'Unassigned' : x ? `Volume ${x.id}: ${x.title}` : `Volume ${v}`; };
+    const volHTML = v => `<div class="vol card"><div><div class="t">${esc(v.id)}. ${esc(v.title)}</div><div class="q">${esc(v.summary)}</div>
+        ${expanded ? `<div class="paths">${(v.paths || []).map(esc).join(' · ')}</div>` : ''}</div>
+        <div class="side">${v.lines ? Number(v.lines).toLocaleString() + ' lines' : ''}<div><button class="skip" data-vol="${esc(v.id)}">Plan this volume</button></div></div></div>`;
+    function rowHTML(s) {
+      const deps = (s.depends_on || []).map(d => {
+        const ok = doneIds.has(d) || sel.has(d);
+        return `<span class="chip ${ok ? '' : 'need'}" title="${esc(byId[d] ? byId[d].title : d)}">needs ${esc(d)}${ok ? '' : ' !'}</span>`;
+      }).join('');
+      const st = s.status === 'done' ? `<div class="st done">done</div><div>${s.words.toLocaleString()} words</div>`
+        : s.status === 'researched' || s.step === 'write' ? `<div class="st researched">notes ready</div><div>write only · ${k(s.cost)}</div>`
+        : `<div class="st ${esc(s.status)}">${esc(s.status)}</div><div>${k(s.cost)}</div>`;
+      return `<div class="row ${expanded ? 'open' : ''} ${sel.has(s.id) ? 'on' : ''} ${s.status === 'done' ? 'done' : ''} ${skip.has(s.id) ? 'skipped' : ''}" data-id="${esc(s.id)}">
+        <input type="checkbox" ${sel.has(s.id) || s.status === 'done' ? 'checked' : ''} ${s.status === 'done' ? 'disabled' : ''} aria-label="select ${esc(s.title)}">
+        <div class="id">${esc(s.id)}</div>
+        <div><div class="t">${esc(s.title)}</div><div class="q">${esc(s.question)}</div>
+          <div class="chips">${multiVol && volOf(s) ? `<span class="chip">vol ${esc(volOf(s))}</span>` : ''}${s.foundation ? '<span class="chip f">foundation</span>' : ''}<span class="chip">${esc(s.type)}</span><span class="chip">${esc(s.direction)}</span>${(s.layers || []).map(l => `<span class="chip">${esc(l)}</span>`).join('')}${s.est_lines ? `<span class="chip">${Number(s.est_lines).toLocaleString()} ln</span>` : ''}${deps}</div>
+          <div class="more"><div><b>Starts from:</b> ${esc(s.entry)}</div><div><b>Why ${esc(s.direction)}:</b> ${esc(s.why_direction)}</div></div>
+        </div>
+        <div class="side">${st}${s.status !== 'done' ? `<div><button class="skip" data-skip="${esc(s.id)}">${skip.has(s.id) ? 'unskip' : 'skip'}</button></div>` : ''}</div>
+      </div>`;
+    }
+    function render() {
+      const q = document.getElementById('q').value.trim().toLowerCase();
+      const match = s => !q || [s.id, s.title, s.question, s.type, s.direction, (s.layers || []).join(' '), volTitle(volOf(s))].join(' ').toLowerCase().includes(q);
+      let body;
+      if (multiVol) {
+        const order = [];
+        data.slices.forEach(s => { const v = volOf(s); if (!order.includes(v)) order.push(v); });
+        body = order.map(v => {
+          const rows = data.slices.filter(s => volOf(s) === v && match(s));   // plan order, foundations chipped
+          return rows.length ? `<div class="grp">${esc(volTitle(v))} (${rows.length})</div>${rows.map(rowHTML).join('')}` : '';
+        }).join('');
+      } else {
+        const f = data.slices.filter(s => s.foundation && match(s)), c = data.slices.filter(s => !s.foundation && match(s));
+        body = (f.length ? `<div class="grp">Foundations</div>${f.map(rowHTML).join('')}` : '') +
+          (c.length ? `<div class="grp">Concepts</div>${c.map(rowHTML).join('')}` : '');
+      }
+      list.innerHTML = body +
+        (!body ? '<p class="sub">No slices match.</p>' : '') +
+        (openVols.length ? `<div class="grp">Other volumes, not started (${openVols.length})</div><p class="sub">Starting one adds its chapters to this same guide. Any slices selected above stay saved.</p>${openVols.map(volHTML).join('')}` : '') +
+        (data.not_covered && data.not_covered.length ? `<details class="nc"><summary>Deliberately not covered (${data.not_covered.length})</summary><ul>${data.not_covered.map(n => `<li><span class="mono">${(n.paths || []).map(esc).join(', ')}</span>: ${esc(n.why)}</li>`).join('')}</ul></details>` : '');
+      totals();
+    }
+    function missingDeps() {
+      const out = new Set();
+      const walk = id => (byId[id] && byId[id].depends_on || []).forEach(d => { if (!doneIds.has(d) && !sel.has(d) && !out.has(d)) { out.add(d); walk(d); } });
+      sel.forEach(walk);
+      return [...out];
+    }
+    function totals() {
+      const chosen = data.slices.filter(s => sel.has(s.id));
+      const cost = chosen.reduce((a, s) => a + s.cost, 0) + (chosen.length ? data.bookends_cost : 0);
+      const writeOnly = chosen.filter(s => s.step === 'write').length;
+      document.getElementById('n').textContent = chosen.length;
+      document.getElementById('cost').textContent = k(cost);
+      const perVol = multiVol && chosen.length
+        ? ' · ' + [...new Set(chosen.map(volOf))].map(v => `${chosen.filter(s => volOf(s) === v).length} from ${v ? 'vol ' + v : 'unassigned'}`).join(', ')
+        : '';
+      document.getElementById('split').textContent = chosen.length ? `${chosen.length - writeOnly} research + write, ${writeOnly} write only, plus overview/closing${perVol} · ${data.cost_basis}` : '';
+      const miss = missingDeps();
+      document.getElementById('warn').innerHTML = miss.length
+        ? `Selected chapters build on ${miss.map(d => `<b>${esc(d)}</b> ${esc(byId[d] ? byId[d].title : '')}`).join(', ')}, which ${miss.length > 1 ? "aren't" : "isn't"} selected. <button id="adddeps">Add ${miss.length > 1 ? 'them' : 'it'}</button>` : '';
+      const add = document.getElementById('adddeps');
+      if (add) add.onclick = () => { miss.forEach(d => { sel.add(d); skip.delete(d); }); render(); };
+      document.getElementById('go').disabled = !chosen.length && app.querySelector('input[name=run]:checked').value !== 'none';
+    }
+    list.addEventListener('click', e => {
+      const vb = e.target.closest('[data-vol]');
+      if (vb) {
+        const v = data.volumes.find(x => String(x.id) === vb.dataset.vol);
+        const order = data.slices.filter(s => sel.has(s.id)).map(s => s.id);
+        submit({ action: 'volume', volume: v.id, title: v.title, paths: v.paths, selected: order, skipped: [...skip] }, `Volume ${v.id} chosen`);
+        return;
+      }
+      const sk = e.target.closest('[data-skip]');
+      if (sk) { const id = sk.dataset.skip; if (skip.has(id)) skip.delete(id); else { skip.add(id); sel.delete(id); } render(); return; }
+      const row = e.target.closest('.row'); if (!row || row.classList.contains('done')) return;
+      const id = row.dataset.id;
+      if (sel.has(id)) sel.delete(id); else { sel.add(id); skip.delete(id); }
+      render();
+    });
+    document.getElementById('q').oninput = render;
+    document.querySelectorAll('[data-q]').forEach(b => b.onclick = () => {
+      const m = b.dataset.q; sel.clear();
+      if (m === 'found') data.slices.filter(s => s.foundation && open(s)).forEach(s => sel.add(s.id));
+      if (m === 'open') data.slices.filter(s => open(s) && !skip.has(s.id)).forEach(s => sel.add(s.id));
+      render();
+    });
+    document.getElementById('expand').onclick = e => { expanded = !expanded; e.target.textContent = expanded ? 'Hide details' : 'Show details'; render(); };
+    app.querySelectorAll('input[name=run]').forEach(r => r.onchange = totals);
+    document.getElementById('cancel').onclick = () => submit({ action: 'cancel' }, 'Cancelled');
+    document.getElementById('go').onclick = () => {
+      const order = data.slices.filter(s => sel.has(s.id)).map(s => s.id);
+      const run = app.querySelector('input[name=run]:checked').value;
+      submit({ action: 'run', selected: order, skipped: [...skip], run },
+        run === 'none' ? `Saved ${order.length} selected` : `Running ${run === 'all' ? order.length : Math.min(order.length, run === 'one' ? 1 : 3)} of ${order.length}`);
+    };
+    render();
+  }
+})();
+</script>
+</body></html>
