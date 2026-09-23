@@ -41,6 +41,7 @@ main{max-width:1040px;margin:0 auto;padding:8px 16px 180px}
 .side{text-align:right;font-size:12px;color:var(--muted);white-space:nowrap}
 .side .st{font:600 11px ui-monospace,Menlo,monospace;text-transform:uppercase;letter-spacing:.05em}
 .st.done{color:var(--ok)}.st.researched{color:var(--accent)}.st.skipped{color:var(--bad)}
+.st.critical{color:var(--bad)}.st.major{color:var(--warn)}.st.minor{color:var(--muted)}
 .skip{margin-top:6px;font-size:11px;padding:2px 7px}
 .foot{position:fixed;left:0;right:0;bottom:0;z-index:4;background:var(--panel);border-top:1px solid var(--rule);box-shadow:0 -6px 18px rgba(0,0,0,.06)}
 .foot .in{max-width:1040px;margin:0 auto;padding:12px 16px;display:grid;gap:10px}
@@ -85,8 +86,57 @@ details.nc{margin-top:24px;color:var(--muted);font-size:13px}
 
   const header = (title, sub) => `<header><h1>${esc(title)}</h1><div class="sub">${sub}</div></header>`;
 
+  if (data.mode === 'docs') return renderDocs();
   if (data.mode === 'volumes') return renderVolumes();
   renderSlices();
+
+  function renderDocs() {
+    const rows = data.doc_findings || [];
+    const sel = new Set(rows.filter(r => r.verified).map(r => r.id));
+    const sevs = ['critical', 'major', 'minor'];
+    app.innerHTML = header(data.title,
+      `Documents that disagree with the code this guide was written from. Only findings whose citation still resolves can be applied. <span class="mono">${esc(data.workspace)}</span>`) +
+      `<main id="list"></main>
+      <div class="foot"><div class="in">
+        <div class="sum"><span><b id="n">0</b> selected</span><span class="sub" id="split"></span></div>
+        <div class="actions"><div><button id="cancel">Cancel</button> <button class="primary" id="go">Update these docs</button></div></div>
+      </div></div>`;
+    const list = document.getElementById('list');
+    function rowHTML(r) {
+      return `<div class="row ${sel.has(r.id) ? 'on' : ''} ${r.verified ? '' : 'skipped'}" data-id="${esc(r.id)}">
+        <input type="checkbox" ${sel.has(r.id) ? 'checked' : ''} ${r.verified ? '' : 'disabled'} aria-label="select ${esc(r.id)}">
+        <div class="id">${esc(r.id)}</div>
+        <div><div class="t">${esc(r.doc)}</div><div class="q">${esc(r.text)}</div>
+          <div class="chips"><span class="chip">ch ${esc(r.chapter)}</span>${r.verified ? '<span class="chip f">citation verified</span>' : '<span class="chip need">unverified - not applicable</span>'}</div>
+          ${r.verified ? '' : `<div class="more"><div>${esc((r.problems || []).join('; '))}</div></div>`}
+        </div>
+        <div class="side"><div class="st ${esc(r.sev)}">${esc(r.sev)}</div></div>
+      </div>`;
+    }
+    function totals() {
+      document.getElementById('n').textContent = sel.size;
+      const un = rows.filter(r => !r.verified).length;
+      document.getElementById('split').textContent = un ? `${un} unverified, left out` : '';
+      document.getElementById('go').disabled = !sel.size;
+    }
+    function render() {
+      list.innerHTML = sevs.map(s => {
+        const g = rows.filter(r => r.sev === s);
+        return g.length ? `<div class="grp">${s} (${g.length})</div>${g.map(rowHTML).join('')}` : '';
+      }).join('') || '<p class="sub">No doc drift recorded in the notes.</p>';
+      totals();
+    }
+    list.addEventListener('click', e => {
+      const row = e.target.closest('.row'); if (!row) return;
+      const r = rows.find(x => x.id === row.dataset.id);
+      if (!r || !r.verified) return;
+      if (sel.has(r.id)) sel.delete(r.id); else sel.add(r.id);
+      render();
+    });
+    document.getElementById('cancel').onclick = () => submit({ action: 'cancel' }, 'Cancelled');
+    document.getElementById('go').onclick = () => submit({ action: 'docs', selected: [...sel] }, `${sel.size} document fix(es) chosen`);
+    render();
+  }
 
   function renderVolumes() {
     let pick = null;

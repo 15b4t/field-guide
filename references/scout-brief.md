@@ -39,6 +39,17 @@ topic lives:
 
 A path list that is all backend, or all one folder, usually means you stopped too early.
 
+## Step 2b: does the topic stop at this repo?
+
+If your prompt lists other repos, run `fg.py probe <alias> <your vocabulary>` for each. It reports how
+many files there mention the concept's names and where they sit.
+
+A concept that lives mostly in one repo and is merely *called* from another stays single-repo. A
+concept whose halves are in different repos (the UI that shows it in one, the service that produces it
+in the other; a contract both sides implement) is one concept, and the guide should follow it across.
+Put what you find in `spans`, with the numbers, and let the user decide - don't scope the other
+repo's paths in yourself unless you were told the answer is yes.
+
 ## Step 3: decide the edges
 
 Include a path when the topic **owns** it, or when the topic's behaviour can't be explained without it.
@@ -62,6 +73,7 @@ a fenced block, and nothing after it:
   "paths": ["<path prefixes the guide is scoped to, most central first>"],
   "related": [{"path": "<shared thing the topic uses>", "why": "<one line>"}],
   "layers": ["server", "client", "shared", "infra"],
+  "spans": [{"repo": "<alias>", "files": 0, "hits": 0, "areas": ["<where it sits there>"]}],
   "notes": "<one or two lines: anything that surprised you, or an edge you were unsure about>"
 }
 ```

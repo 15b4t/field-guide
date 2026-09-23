@@ -49,6 +49,7 @@ chapters/NN-slug.md            prose (00-overview and 99-closing are the bookend
 glossary.md                    terms, appended per chapter
 GUIDE.md / guide.html          assembled output (FG build)
 FINDINGS.md                    every open gap, severity-tagged and cited (FG build)
+DOC_FINDINGS.md                docs that disagree with the code, triaged (FG docs)
 ```
 
 **One workspace, however big the repo.** A codebase too large for a single sequence is split into
@@ -80,11 +81,12 @@ budgets.
 - `next [N]`: run the next N (default 1) selected or proposed slices in order, without asking.
 - `slice <id>`: **Run one slice** for that id.
 - `finish`: show `FG remaining --include-proposed`'s total in one line, then open **the picker** with
-  `--default-run all`, and run `run_now` in order. Then **Bookends**, `FG build` and the final report.
+  `--default-run all`, and run `run_now` in order. Then **Bookends**, `FG build`, **Doc fixes** and the final report.
 - `update` (or `refresh`): **Refresh**.
 - `rewrite <id|all>`: re-run only the Write step from existing notes (after changing `tone`, `depth`
   or `assumes`, or after a review), in plan order; then **Bookends** and `FG build`.
 - `build`: **Bookends** if any chapter is newer than them, then `FG build`.
+- `docs`: **Doc fixes**, without rebuilding.
 - `config`: show `FG config` compactly and apply changes with `FG config --set`. For model or budget
   changes, ask "just this guide or all repos?" and offer the models with `AskUserQuestion`.
 
@@ -107,8 +109,11 @@ Run `FG config --json` (works without a workspace) for the user's defaults, then
   recommended, or just this guide). Skip the model questions if the user file already sets `models`;
   just name the models in use.
 
-**Multi-repo guides** (only when the user explicitly asks to include other repos, e.g. a separate
-frontend and backend, or services that talk to each other): add `--repo <name>=<path>` to `init`, once
+**Multi-repo guides.** Run `FG siblings` during setup. It reports checkouts next to this one that
+build packages of the same name - the signal that they are one product split across repos, not merely
+two repos by the same team. If one scores high, name it and ask (one `AskUserQuestion`, default no)
+whether concepts that span it should be followed across; the user may also ask for this directly.
+On yes, add `--repo <name>=<path>` to `init`, once
 per repo including the current one, with short names the user will recognise. Put the workspace in one
 of the repos or in their common parent. Subagents will read the other repos, so if those are outside
 this session's working directory, tell the user to add them first (`/add-dir <path>`, or start Claude
@@ -150,7 +155,12 @@ Slice and volume choices go through a browser picker, since real plans have too 
    not scope to these: `<chapter titles>`."
 3. **Make it a volume.** From the scout's JSON: `FG volume add <id> --title "<title>" --paths <a,b,c>`
    with the next free letter, then `FG volume start <id>`, then `FG map`.
-4. **Plan** it, passing the scout's `vocabulary` and `related` to the planner, then **Select and run**.
+4. **Span check.** For each repo in the config beyond this one, `FG probe <alias> <vocabulary>`. If a
+   sibling holds a real share of the concept, say so in one line with the numbers ("notifications:
+   592 mentions across 96 files in web") and ask whether this guide should follow it across. On yes,
+   the volume's paths gain that repo's areas as `alias:path`, and the planner is told the concept spans
+   both. On no, note it in `not_covered` so nobody re-asks.
+5. **Plan** it, passing the scout's `vocabulary` and `related` to the planner, then **Select and run**.
 
 A topic volume is a volume like any other: same chapter numbering, same glossary, one built guide.
 
@@ -189,6 +199,22 @@ A slice whose notes already exist skips step 1 (`FG remaining` shows this).
    (5-file budget), append the result to the notes, and have the writer revise. Report **Conflicts** to
    the user.
 5. `FG mark <id> --status done`, which records the relied-on file hashes for Refresh.
+
+## Doc fixes
+
+The guide is the only thing that reads the documents and the code side by side, so it is the only
+thing that can tell you a document has gone wrong. After a full run, offer to act on that.
+
+1. `FG docs`. No findings: say so in one line and stop.
+2. Report the counts in one line (`3 critical, 5 major, 2 minor; 2 unverified`), then run **the
+   picker** with `--docs`. Unverified findings are shown but can't be selected.
+3. `cancel`/`timeout`, or nothing selected: stop, and say the report is in `DOC_FINDINGS.md`.
+4. Otherwise spawn `models.writer`: "Read `<skill>/references/doc-brief.md` and follow it. Workspace:
+   `<dir>`. Apply these findings: `<the selected rows from doc-findings.json>`."
+5. Report what it applied and what it skipped, one line each, and say the edits are uncommitted.
+
+Never edit a document without the picker, and never apply an unverified finding. A wrong correction
+to a document outlasts a wrong chapter, because people and agents act on documents.
 
 ## Bookends
 

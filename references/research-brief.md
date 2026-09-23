@@ -11,8 +11,14 @@ refresh, the old notes plus the changed files.
 ## The code is the only source of truth
 
 Comments, docs, READMEs, commit messages and old notes are **leads**. A claim goes into the notes only
-after you've seen the code that makes it true. If a comment and the code disagree, the code wins, and
-the disagreement goes under Open gaps.
+after you've seen the code that makes it true. If a doc and the code disagree, the code wins, and the
+disagreement goes under **Doc drift** - not Open gaps, which is for problems in the code itself.
+
+You are the only step that reads the docs and the code side by side, so you are the only step that can
+catch a document that has gone wrong. Once you know how the concept actually works, spend a few greps
+checking the documents a developer here would trust: the repo's `README`, `CLAUDE.md` or equivalent
+agent instructions, anything under `docs/`, and rule files that tell people how to write code for this
+area. Grep them for the concept's names rather than reading them end to end.
 
 ## Budget: this is where tokens burn, so read like a surgeon
 
@@ -68,13 +74,24 @@ including under Files relied on. The checker rejects unprefixed paths in this mo
      call sites *by module*, don't open them.
    - **Pinned by tests**: which tests already lock this behaviour down, and — just as useful — which
      parts nothing covers.
-8. **Terms.** Domain or codebase-specific words the chapter must define.
-9. **Open gaps.** Real, current problems or drift you saw in the code: TODOs backed by behaviour,
+8. **Doc drift.** Documents that contradict the code you just read. Each one names the document and
+   line, what it claims, what the code does instead, and a citation proving it. Severity is about what
+   happens to someone who trusts the document:
+   - `critical` - following it produces broken, insecure or non-compiling code (it names a function
+     that doesn't exist, documents the wrong auth check, describes a contract backwards)
+   - `major` - it describes behaviour wrongly and will mislead, but won't break what they write
+   - `minor` - stale names, counts, paths or wording; nothing acts on it incorrectly
+   These are applied to the real documents later, so a claim with no working citation is worse than no
+   claim at all. Cite the code, not your memory of it, and re-check the line range before you write it.
+
+9. **Terms.** Domain or codebase-specific words the chapter must define.
+10. **Open gaps.** Real, current problems or drift you saw in the code: TODOs backed by behaviour,
    mismatched checks, stale comments that mislead. Say what you saw, not what might be. Tag each one:
    `[high]` can lose or corrupt data, breaks security, or makes a core promise false; `[med]` is wrong
-   behaviour a user or developer will hit; `[low]` is a stale comment, doc drift, cosmetics or a
-   theoretical edge. These gaps feed a team-facing `FINDINGS.md`. The guide shows only the few that
-   change how a reader should think about the system.
+   behaviour a user or developer will hit; `[low]` is a stale comment, cosmetics or a theoretical
+   edge. A wrong *document* is not an open gap; it belongs under Doc drift. These gaps feed a
+   team-facing `FINDINGS.md`. The guide shows only the few that change how a reader should think
+   about the system.
 
 ## Notes format (write exactly these headings)
 
@@ -111,6 +128,9 @@ Researched: <date>. Direction: <top-down|bottom-up>. Type: <type>.
 - **Not covered by tests**: <behaviour nothing asserts> - state the search that proves it
   (`grep -rn '<symbol>' <test dirs>` returned nothing). A negative claim with no search behind it is a
   guess; leave it out.
+
+## Doc drift
+- [critical|major|minor] `path/to/doc.md:LINE` claims <what it says>; <what the code does> (`Symbol` path/to/code.ext:120-148)
 
 ## Terms
 - **term**: plain definition

@@ -23,6 +23,9 @@ Subcommands:
   files ID                       the files a chapter was written from, marking changed ones
   volume [list|add|start]        volumes inside this workspace; one guide, one glossary, one numbering
   topic TERM...                  what the guide already says about a topic, before researching it again
+  docs [--json]                  doc drift found while researching, triaged critical/major/minor
+  siblings [--json]              nearby checkouts that share code with this one
+  probe REPO TERM...             how much of a concept lives in another repo
   stale                          slices whose relied-on files changed; unassigned areas
   digest [--recaps-only]         chapter recaps (+ open gaps) for writers and bookends
   build                          assemble GUIDE.md / guide.html, and FINDINGS.md from notes
@@ -1019,10 +1022,12 @@ def cmd_pick(args):
                                                    "foundation", "status", "volume")},
                            "step": step, "cost": cost,
                            "words": len(open(ch).read().split()) if os.path.exists(ch) else 0})
-        mode = "volumes" if plan.get("volumes") and not plan.get("slices") else "slices"
+        mode = ("docs" if getattr(args, "docs", False)
+                else "volumes" if plan.get("volumes") and not plan.get("slices") else "slices")
+        docs = collect_doc_findings(d, cfg, plan) if mode == "docs" else []
         return {"mode": mode, "title": cfg.get("title") or os.path.basename(os.path.abspath(".")),
                 "workspace": d, "depth": cfg.get("depth"), "models": cfg.get("models"),
-                "volumes": volume_states(cfg, plan), "slices": slices,
+                "volumes": volume_states(cfg, plan), "slices": slices, "doc_findings": docs,
                 "not_covered": plan.get("not_covered", []), "bookends_cost": est["bookends"][0],
                 "cost_basis": est["research"][1],
                 "default_run": args.default_run}
@@ -1102,6 +1107,35 @@ CITE_RX = re.compile(r"`?((?:[A-Za-z0-9_-]+:)?(?:[\w.@+-]+/)*[\w.@+-]+\.\w+):(\d
 SYM_RX = re.compile(r"`([A-Za-z_][\w.]*(?:\(\))?)`")
 
 
+def check_citations(line, roots, cache, skip=()):
+    """(ok, problems) for the `path:line` citations on one line of notes. Shared by `check` and by
+    doc-drift verification, so a claim is held to the same standard wherever it is acted on."""
+    syms = [m.rstrip("()").split(".")[-1] for m in SYM_RX.findall(line) if ":" not in m and "/" not in m]
+    ok, bad = 0, []
+    for m in CITE_RX.finditer(line):
+        f, a, b = roots.normalize(m.group(1)), int(m.group(2)), int(m.group(3) or m.group(2))
+        if f in skip:
+            continue
+        if f not in cache:
+            fp = roots.fs(f)
+            cache[f] = open(fp, errors="ignore").read().splitlines() if fp and os.path.isfile(fp) else None
+        src = cache[f]
+        if src is None:
+            hint = " (multi-repo: cite as alias:path)" if roots.multi and roots.split(f)[0] is None else ""
+            bad.append(f"{f} does not exist{hint}")
+            continue
+        if a < 1 or b > len(src) or a > b:
+            bad.append(f"{f}:{a}-{b} out of range (file has {len(src)} lines)")
+            continue
+        window = "\n".join(src[max(0, a - 6): b + 5])
+        missing = [x for x in syms if len(x) > 2 and x not in window]
+        if syms and len(missing) == len(syms):
+            bad.append(f"none of {syms} found near {f}:{a}-{b}")
+            continue
+        ok += 1
+    return ok, bad
+
+
 def cmd_check(args):
     d, cfg = workspace(args)
     roots = Roots(d, cfg)
@@ -1111,26 +1145,9 @@ def cmd_check(args):
         die(f"{path} does not exist")
     bad, ok, cache = [], 0, {}
     for lineno, line in enumerate(open(path), 1):
-        syms = [m.rstrip("()").split(".")[-1] for m in SYM_RX.findall(line) if ":" not in m and "/" not in m]
-        for m in CITE_RX.finditer(line):
-            f, a, b = roots.normalize(m.group(1)), int(m.group(2)), int(m.group(3) or m.group(2))
-            if f not in cache:
-                fp = roots.fs(f)
-                cache[f] = open(fp, errors="ignore").read().splitlines() if fp and os.path.isfile(fp) else None
-            src = cache[f]
-            if src is None:
-                hint = " (multi-repo: cite as alias:path)" if roots.multi and roots.split(f)[0] is None else ""
-                bad.append(f"notes:{lineno}: {f} does not exist{hint}")
-                continue
-            if a < 1 or b > len(src) or a > b:
-                bad.append(f"notes:{lineno}: {f}:{a}-{b} out of range (file has {len(src)} lines)")
-                continue
-            window = "\n".join(src[max(0, a - 6): b + 5])
-            missing = [x for x in syms if len(x) > 2 and x not in window]
-            if syms and len(missing) == len(syms):
-                bad.append(f"notes:{lineno}: none of {syms} found near {f}:{a}-{b}")
-                continue
-            ok += 1
+        n, problems = check_citations(line, roots, cache)
+        ok += n
+        bad += [f"notes:{lineno}: {p}" for p in problems]
     print(f"citations ok: {ok}, problems: {len(bad)}")
     for b in bad:
         print("  " + b)
@@ -1174,6 +1191,110 @@ def cmd_mark(args):
         s["git_head"] = heads if roots.multi else heads.get("repo")
     save_json(plan_path(d), plan)
     print(f"{s['id']} -> {args.status} ({len(s.get('files', {}))} files tracked)")
+
+
+def _repo_signature(root, depth=3):
+    """Cheap fingerprint of a checkout: (own package names, third-party deps, source dirs).
+
+    Kept apart because they mean different things. Two repos declaring a package of the same name are
+    building the same code; two repos depending on `express` are just both web servers."""
+    own, deps, dirs = set(), set(), set()
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel = os.path.relpath(dirpath, root)
+        if rel.count(os.sep) >= depth:
+            dirnames[:] = []
+        dirnames[:] = [x for x in dirnames if x not in PRUNE_DIRS and not x.startswith(".")]
+        if rel != ".":
+            dirs.add(rel)
+        if "package.json" in filenames:
+            pkg = load_json(os.path.join(dirpath, "package.json"), {}) or {}
+            if isinstance(pkg, dict):
+                if pkg.get("name"):
+                    own.add(str(pkg["name"]))
+                for k in ("dependencies", "devDependencies"):
+                    deps.update(str(x) for x in (pkg.get(k) or {}))
+    return own, deps, dirs
+
+
+def cmd_siblings(args):
+    """Checkouts next door that look like the same product. A concept rarely stops at a repo
+    boundary, but multi-repo guides are opt-in, so nothing suggests them unless we look."""
+    here = os.path.abspath(args.root or ".")
+    parent = os.path.dirname(here)
+    mine_own, mine_deps, mine_dirs = _repo_signature(here)
+    rows = []
+    for name in sorted(os.listdir(parent)):
+        other = os.path.join(parent, name)
+        if other == here or not os.path.isdir(os.path.join(other, ".git")):
+            continue
+        own_n, deps_n, dirs_n = _repo_signature(other)
+        own = sorted(mine_own & own_n)
+        shared_dirs = sorted(mine_dirs & dirs_n)
+        shared_deps = mine_deps & deps_n
+        score = int(min(100, len(own) * 18 + len(shared_dirs) + len(shared_deps) * 0.15))
+        if score >= 10:
+            rows.append({"name": name, "path": other, "score": score, "shared_packages": own,
+                         "shared_dirs": shared_dirs[:12], "shared_deps": len(shared_deps)})
+    rows.sort(key=lambda r: -r["score"])
+    if args.json:
+        print(json.dumps(rows, indent=2))
+        return
+    if not rows:
+        print(f"no sibling checkouts next to {here} look related")
+        return
+    print(f"checkouts beside {os.path.basename(here)} that share code or structure:")
+    for r in rows:
+        print(f"  {r['name']:<28} score {r['score']:>3}  {r['path']}")
+        if r["shared_packages"]:
+            print(f"      builds the same packages: {', '.join(r['shared_packages'][:8])}")
+        else:
+            print(f"      no shared packages; {r['shared_deps']} common dependencies, "
+                  f"{len(r['shared_dirs'])} common paths")
+    print("\nTo span a concept across one, add it as a repo: `init --repo <alias>=<path>` "
+          "(see the skill's multi-repo setup), then probe it per concept.")
+
+
+def cmd_probe(args):
+    """How much of a concept lives in another checkout, before deciding to span a slice across it."""
+    d, cfg = workspace(args)
+    roots = Roots(d, cfg)
+    target = roots.by_alias.get(args.repo) or args.repo
+    if not os.path.isdir(target):
+        die(f"{args.repo!r} is not a repo alias or a directory")
+    cmd = ["grep", "-rIcF"]
+    for t in args.terms:
+        cmd += ["-e", t]
+    for x in sorted(PRUNE_DIRS):
+        cmd += ["--exclude-dir", x]
+    cmd.append(target)
+    res = subprocess.run(cmd, capture_output=True, text=True)
+    hits = {}
+    for line in res.stdout.splitlines():
+        path, _, n = line.rpartition(":")
+        if not n.isdigit() or int(n) == 0:
+            continue
+        rel = os.path.relpath(path, target)
+        if os.path.splitext(rel)[1] in SOURCE_EXT:
+            hits[rel] = int(n)
+    if args.json:
+        print(json.dumps({"repo": args.repo, "path": target, "terms": args.terms,
+                          "files": len(hits), "hits": sum(hits.values()),
+                          "by_area": Counter("/".join(f.split("/")[:3]) for f in hits).most_common(12),
+                          "top_files": sorted(hits.items(), key=lambda x: -x[1])[:15]}, indent=2))
+        return
+    if not hits:
+        print(f"{args.repo}: no source file mentions {' / '.join(args.terms)}")
+        return
+    print(f"{args.repo}: {sum(hits.values())} mentions of {' / '.join(args.terms)} "
+          f"across {len(hits)} files")
+    areas = Counter()
+    for f, n in hits.items():
+        areas["/".join(f.split("/")[:3])] += n
+    for area, n in areas.most_common(10):
+        print(f"    {area + '/':<52} {n:>5}")
+    print("  top files:")
+    for f, n in sorted(hits.items(), key=lambda x: -x[1])[:6]:
+        print(f"    {f:<52} {n:>5}")
 
 
 def cmd_volume(args):
@@ -1396,6 +1517,101 @@ def open_gaps(notes_path):
         elif on and line.startswith("  ") and items:
             items[-1] = (items[-1][0], items[-1][1] + " " + line.strip())
     return items
+
+
+DOC_RX = re.compile(r"^\s*[-*]\s*\[(critical|major|minor)\]\s*`([^`]+)`\s*(.*)$", re.I)
+DOC_SEV_ORDER = {"critical": 0, "major": 1, "minor": 2}
+
+
+def doc_drift(notes_path):
+    """(severity, doc_ref, text) per bullet under the notes' 'Doc drift' heading."""
+    items, on = [], False
+    for line in open(notes_path):
+        if line.startswith("## "):
+            on = "doc drift" in line.lower()
+            continue
+        if on:
+            m = DOC_RX.match(line)
+            if m:
+                items.append((m.group(1).lower(), m.group(2).strip(), m.group(3).strip()))
+            elif line.startswith("  ") and items:
+                items[-1] = (*items[-1][:2], items[-1][2] + " " + line.strip())
+    return items
+
+
+def collect_doc_findings(d, cfg, plan):
+    """Every doc-drift claim, with its code citations re-verified now.
+
+    A doc fix is a write to a file the team relies on, so an unverified claim is reported but never
+    offered for application: the researcher's own citation has to still resolve against the code."""
+    roots = Roots(d, cfg)
+    cache, out = {}, []
+    for s in plan["slices"]:
+        notes = slice_file(d, "notes", s)
+        if s.get("status") not in ("researched", "written", "done") or not os.path.exists(notes):
+            continue
+        for sev, ref, text in doc_drift(notes):
+            doc_path = roots.normalize(ref)
+            ok, problems = check_citations(text, roots, cache, skip={doc_path})
+            exists = bool(roots.fs(doc_path)) and os.path.isfile(roots.fs(doc_path) or "")
+            if not exists:
+                problems = [f"{doc_path} does not exist"] + problems
+            out.append({"id": f"D{len(out) + 1}", "sev": sev, "chapter": s["id"],
+                        "chapter_title": s["title"], "doc": ref, "doc_path": doc_path,
+                        "text": text, "cites": ok, "problems": problems,
+                        "verified": exists and ok > 0 and not problems})
+    out.sort(key=lambda r: (DOC_SEV_ORDER.get(r["sev"], 3), r["doc_path"], r["chapter"]))
+    for i, r in enumerate(out, 1):
+        r["id"] = f"D{i}"
+    return out
+
+
+def write_doc_findings(d, rows):
+    """DOC_FINDINGS.md: what the docs claim that the code contradicts, triaged for action."""
+    if not rows:
+        return None
+    by_doc = Counter(r["doc_path"] for r in rows)
+    out = ["# Doc findings", "",
+           f"Generated {now()} by `fg.py docs` from the research notes' Doc drift sections: places where "
+           "a document the team relies on disagrees with the code the guide was written from. "
+           "Unverified rows are shown but are not offered for automatic correction.", "",
+           f"{len(rows)} finding(s) across {len(by_doc)} document(s).", ""]
+    for sev in ("critical", "major", "minor"):
+        group = [r for r in rows if r["sev"] == sev]
+        if not group:
+            continue
+        out += [f"## {sev.title()} ({len(group)})", "",
+                "| id | document | ch | finding | verified |", "|---|---|---|---|---|"]
+        for r in group:
+            mark = "yes" if r["verified"] else "no - " + "; ".join(r["problems"][:2])
+            out.append(f"| {r['id']} | `{r['doc']}` | {r['chapter']} | "
+                       f"{r['text'].replace('|', chr(92) + '|')} | {mark} |")
+        out.append("")
+    path = os.path.join(d, "DOC_FINDINGS.md")
+    with open(path, "w") as f:
+        f.write("\n".join(out).rstrip() + "\n")
+    return path, len(rows)
+
+
+def cmd_docs(args):
+    d, cfg = workspace(args)
+    plan = load_plan(d)
+    rows = collect_doc_findings(d, cfg, plan)
+    save_json(os.path.join(d, "doc-findings.json"), {"generated": now(), "findings": rows})
+    if args.json:
+        print(json.dumps(rows, indent=2))
+        return
+    if not rows:
+        print("no doc drift recorded in the notes")
+        return
+    res = write_doc_findings(d, rows)
+    counts = Counter(r["sev"] for r in rows)
+    print(f"wrote {res[0]}: " + ", ".join(f"{counts[s]} {s}" for s in ("critical", "major", "minor")
+                                          if counts[s]))
+    unver = [r for r in rows if not r["verified"]]
+    if unver:
+        print(f"{len(unver)} not verified against the code and not applicable: "
+              + ", ".join(r["id"] for r in unver[:8]))
 
 
 def write_findings(d, plan):
@@ -1663,6 +1879,8 @@ def main():
     p.add_argument("--no-open", action="store_true", help="print the URL instead of opening a browser")
     p.add_argument("--default-run", choices=["one", "three", "all", "none"], default="one",
                    help="which 'how many to run now' option starts selected")
+    p.add_argument("--docs", action="store_true",
+                   help="pick doc-drift findings to apply instead of slices")
     p = sub.add_parser("remaining")
     p.add_argument("--include-proposed", action="store_true", help="also count slices never selected")
     p = sub.add_parser("volume", help="volumes within this one workspace")
@@ -1675,6 +1893,15 @@ def main():
     q = vs.add_parser("start", help="bring a volume's paths into scope, ready to map and plan")
     q.add_argument("id")
     vs.add_parser("list")
+    p = sub.add_parser("docs", help="doc drift the notes recorded, triaged for action")
+    p.add_argument("--json", action="store_true", help="machine-readable, for the picker")
+    p = sub.add_parser("siblings", help="nearby checkouts that look like the same product")
+    p.add_argument("--root", help="repo to compare from (default: current directory)")
+    p.add_argument("--json", action="store_true")
+    p = sub.add_parser("probe", help="how much of a concept lives in another repo")
+    p.add_argument("repo", help="repo alias from the config, or a path")
+    p.add_argument("terms", nargs="+")
+    p.add_argument("--json", action="store_true")
     p = sub.add_parser("topic", help="what the guide already says about a topic")
     p.add_argument("terms", nargs="+")
     p = sub.add_parser("which", help="which chapter explains these files")
@@ -1689,6 +1916,8 @@ def main():
     {"locate": cmd_locate, "init": cmd_init, "config": cmd_config, "map": cmd_map, "measure": cmd_measure,
      "status": cmd_status, "remaining": cmd_remaining, "pick": cmd_pick, "repos": cmd_repos, "usage": cmd_usage, "check": cmd_check, "mark": cmd_mark, "stale": cmd_stale,
      "which": cmd_which, "files": cmd_files, "volume": cmd_volume, "topic": cmd_topic,
+     "docs": cmd_docs,
+     "siblings": cmd_siblings, "probe": cmd_probe,
      "digest": cmd_digest, "build": cmd_build}[args.cmd](args)
 
 
