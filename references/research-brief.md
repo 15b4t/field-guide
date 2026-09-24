@@ -22,9 +22,13 @@ area. Grep them for the concept's names rather than reading them end to end.
 
 ## Budget: this is where tokens burn, so read like a surgeon
 
-- Hard caps (from config, scaled by depth): about `max_files` distinct files opened, about
-  `max_read_lines` total lines read. Stop and write when you reach either cap. Partial notes that are
-  true beat complete notes you had to rush.
+- Caps (from config, scaled by depth): about `max_files` distinct files opened, about
+  `max_read_lines` total lines read. These bound your **reading**: when you reach one, stop reading and
+  write. Partial notes that are true beat complete notes you had to rush.
+- The caps are best effort, not a gate to iterate against. Trimming notes to hit a number costs more
+  than the overage saves, so **never spend more than one revision pass on length**. Write the notes,
+  and if they are clearly over, do a single pass cutting the least load-bearing material. Then stop,
+  and say in your reply that they came in long. Going 30% over is fine; three rounds of trimming is not.
 - **Turns cost as much as lines.** Every tool call re-sends everything you've read so far, so a file
   read early is paid for again on every later turn. Batch: issue several `grep`s or several `sed -n`
   ranges in parallel in one turn, or combine them in one Bash call. Aim for roughly 8-12 turns in total.
@@ -150,8 +154,8 @@ Researched: <date>. Direction: <top-down|bottom-up>. Type: <type>.
 ```
 
 Citation format matters. `fg.py check` verifies it mechanically: `path:start-end`, repo-relative, with
-the symbol name in backticks on the same line. It must appear within the cited range. Keep the notes
-under `notes_max_words`.
+the symbol name in backticks on the same line. It must appear within the cited range. Aim for `notes_max_words`, within the
+one-revision rule above.
 
 **Files relied on** lists every file whose content you depended on. Future refreshes re-research this
 slice when any of them changes, so list all of them and nothing else.

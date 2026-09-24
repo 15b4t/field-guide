@@ -29,7 +29,10 @@ These keep token usage bounded. Follow them exactly.
    tokens, tool uses, duration) and log it before doing anything else:
    `FG usage log <id> <step> <tokens> --model <m> --tool-uses <n> --duration-ms <ms>`, where step is
    `planner`, `research`, `write`, `bookends`, `reviewer` or `followup`, id is `-` for guide-level
-   steps, and `--note` marks a refresh or rewrite. Estimates switch from fallbacks to measured medians
+   steps, and `--note` marks a refresh or rewrite. The **scout** (see **Topic guide**) is the one
+   subagent with no step of its own: log it as `planner`, with `--note scout`. When a step's configured
+   model is `inherit`, record which model that actually was, as `inherit(opus)`, `inherit(sonnet)` or
+   `inherit(haiku)`, so the log stays readable once you have run the guide on more than one model. Estimates switch from fallbacks to measured medians
    as the log grows; `FG usage` reports totals by step, model and slice.
 
 `FG` means `python3 <this skill's dir>/scripts/fg.py`, run from the repo root.
@@ -39,7 +42,7 @@ These keep token usage bounded. Follow them exactly.
 Default `field-guide/` at the repo root; `FG locate` finds it up to 3 levels deep.
 
 ```
-field-guide.config.json        the guide's definition (committed)
+field-guide.config.json        the guide's definition (commit it to share one, or ignore all of it)
 field-guide.config.local.json  personal overrides: models, budget (gitignored)
 map.md, inventory.json         scripted inventory
 plan.json                      volumes, and slices: volume, type, direction, entry, status, hashes
@@ -136,6 +139,9 @@ Slice and volume choices go through a browser picker, since real plans have too 
    - `{"action": "run", "run_now": [ids]}`: run exactly those, in order.
    - `{"action": "volume", "volume", "paths"}`: `FG volume start <volume>`, `FG map`, then **Plan**
      for that volume, here in this same workspace. The slice view also lists volumes not started yet.
+   - `{"action": "docs", "selected": [ids]}` (only from `pick --docs`): ids into the `findings` array
+     in `<dir>/doc-findings.json`, which `FG docs` wrote. Look the full rows up there; the ids alone
+     carry nothing an editor can act on. `plan.json` is untouched for this action.
    - `cancel` or `timeout`: stop and say so in one line.
 3. If no browser can open it (e.g. SSH): `FG pick --no-open` and give the URL. If that fails too, fall
    back to `AskUserQuestion` with `multiSelect: true`, 16 slices per call, foundations recommended.
@@ -155,11 +161,12 @@ Slice and volume choices go through a browser picker, since real plans have too 
    not scope to these: `<chapter titles>`."
 3. **Make it a volume.** From the scout's JSON: `FG volume add <id> --title "<title>" --paths <a,b,c>`
    with the next free letter, then `FG volume start <id>`, then `FG map`.
-4. **Span check.** For each repo in the config beyond this one, `FG probe <alias> <vocabulary>`. If a
-   sibling holds a real share of the concept, say so in one line with the numbers ("notifications:
-   592 mentions across 96 files in web") and ask whether this guide should follow it across. On yes,
-   the volume's paths gain that repo's areas as `alias:path`, and the planner is told the concept spans
-   both. On no, note it in `not_covered` so nobody re-asks.
+4. **Span check.** Read the scout's `spans` - it already probed each configured repo, so don't run
+   `FG probe` again here. If a sibling holds a real share of the concept, say so in one line with the
+   scout's numbers ("notifications: 592 mentions across 96 files in web") and ask whether this guide
+   should follow it across. On yes, the volume's paths gain that repo's areas as `alias:path`, and the
+   planner is told the concept spans both. On no, note it in `not_covered` so nobody re-asks. (`FG
+   probe` is there for asking the same question outside a scout run.)
 5. **Plan** it, passing the scout's `vocabulary` and `related` to the planner, then **Select and run**.
 
 A topic volume is a volume like any other: same chapter numbering, same glossary, one built guide.

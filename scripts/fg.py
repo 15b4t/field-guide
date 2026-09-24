@@ -44,11 +44,12 @@ import sys
 from collections import Counter, defaultdict
 
 CONFIG_MARKER = "field_guide"
-WS_CONFIG = "field-guide.config.json"            # the guide's definition, committed
+WS_CONFIG = "field-guide.config.json"            # the guide's definition (commit it to
+#                                                  share one definition across a team; many
+#                                                  workspaces are gitignored wholesale instead)
 LOCAL_CONFIG = "field-guide.config.local.json"   # personal overrides, gitignored
 USAGE_LOG = "usage.jsonl"                         # one line per subagent run, gitignored
 GITIGNORED = [LOCAL_CONFIG, USAGE_LOG, ".pick-result.json"]
-LEGACY_CONFIGS = {"config.json": WS_CONFIG, "config.local.json": LOCAL_CONFIG}
 DEFAULT_CONFIG = {
     CONFIG_MARKER: 1,
     "format": "md",                 # md | html | both
@@ -130,11 +131,21 @@ def die(msg):
     sys.exit(1)
 
 
-def load_json(path, default=None):
+def load_json(path, default=None, strict=False):
+    """`strict` for the files the tool cannot run without. plan.json and the workspace config are
+    meant to be shared, so a merge conflict leaves conflict markers in them - invalid JSON on a path
+    that nearly every subcommand walks through."""
     try:
         with open(path) as f:
             return json.load(f)
     except FileNotFoundError:
+        return default
+    except json.JSONDecodeError as e:
+        where = f"line {e.lineno}"
+        if strict:
+            die(f"{path} is not valid JSON ({e.msg}, {where}). If you just merged or rebased, it may "
+                "still contain conflict markers.")
+        print(f"note: ignoring {path}: not valid JSON ({e.msg}, {where})", file=sys.stderr)
         return default
 
 
@@ -156,24 +167,6 @@ def ensure_gitignore(d):
             f.write(text.rstrip("\n") + "\n" + "".join(x + "\n" for x in missing))
 
 
-def migrate(d):
-    """Rename pre-rename workspace config files in place (config.json -> field-guide.config.json)."""
-    old = os.path.join(d, "config.json")
-    if os.path.exists(os.path.join(d, WS_CONFIG)) or not os.path.exists(old):
-        return
-    if CONFIG_MARKER not in (load_json(old, {}) or {}):
-        return
-    for a, b in LEGACY_CONFIGS.items():
-        if os.path.exists(os.path.join(d, a)):
-            os.rename(os.path.join(d, a), os.path.join(d, b))
-    gi = os.path.join(d, ".gitignore")
-    if os.path.exists(gi):
-        text = open(gi).read()
-        if LOCAL_CONFIG not in text:
-            with open(gi, "w") as f:
-                f.write(re.sub(r"(?m)^config\.local\.json$", LOCAL_CONFIG, text))
-    print(f"note: renamed {d}/config*.json to {WS_CONFIG} / {LOCAL_CONFIG}", file=sys.stderr)
-
 
 def locate(root="."):
     for dirpath, dirnames, filenames in os.walk(root):
@@ -183,11 +176,6 @@ def locate(root="."):
             dirnames[:] = []
         if WS_CONFIG in filenames:
             return os.path.normpath(dirpath)
-        if "config.json" in filenames:
-            cfg = load_json(os.path.join(dirpath, "config.json"), {}) or {}
-            if isinstance(cfg, dict) and CONFIG_MARKER in cfg:
-                migrate(dirpath)
-                return os.path.normpath(dirpath)
     return None
 
 
@@ -240,8 +228,7 @@ def workspace(args):
     d = getattr(args, "dir", None) or locate()
     if not d:
         die("no field-guide workspace found; run `fg.py init --dir <dir>` first")
-    migrate(d)
-    if load_json(os.path.join(d, WS_CONFIG)) is None:
+    if load_json(os.path.join(d, WS_CONFIG), strict=True) is None:
         die(f"{d}/{WS_CONFIG} missing")
     ensure_gitignore(d)
     return d, resolve_layers(d)[0]
@@ -328,7 +315,10 @@ def list_files(root, ws):
 
 def matches(path, patterns):
     p = "/" + path
-    return any(fnmatch.fnmatch(p, "*/" + pat.lstrip("*/")) or fnmatch.fnmatch(p, pat) for pat in patterns)
+    # A prefix strip, not lstrip: lstrip("*/") treats those as a character set and would eat the
+    # leading wildcard of a pattern like "*_test.go".
+    bare = lambda pat: pat[2:] if pat.startswith("*/") else pat
+    return any(fnmatch.fnmatch(p, "*/" + bare(pat)) or fnmatch.fnmatch(p, pat) for pat in patterns)
 
 
 def classify(rel, key, cfg, roots):
@@ -373,7 +363,7 @@ def plan_path(d):
 
 
 def load_plan(d):
-    return load_json(plan_path(d), {"slices": []})
+    return load_json(plan_path(d), {"slices": []}, strict=True)
 
 
 def find_slice(plan, sid):
@@ -497,7 +487,6 @@ def cmd_init(args):
                 f"  To re-scope this one anyway and orphan those chapters, add --force.")
     os.makedirs(os.path.join(d, "notes"), exist_ok=True)
     os.makedirs(os.path.join(d, "chapters"), exist_ok=True)
-    migrate(d)
     cfg_path = os.path.join(d, WS_CONFIG)
     cfg = load_json(cfg_path) or {}
     cfg[CONFIG_MARKER] = 1
@@ -551,10 +540,8 @@ def cmd_config(args):
     """Show the resolved config with each value's source layer; --set edits one layer.
 
     Layers, lowest to highest precedence: built-in, user (~/.claude/field-guide.json), workspace
-    (field-guide.config.json, committed), local (field-guide.config.local.json, gitignored)."""
+    (field-guide.config.json), local (field-guide.config.local.json, gitignored)."""
     d = getattr(args, "dir", None) or locate()
-    if d:
-        migrate(d)
     explicit = "user" if args.user else "local" if args.local else "workspace" if args.workspace else None
     edits = defaultdict(list)
     for kv in args.set:
@@ -634,7 +621,7 @@ def find_shared(inv, hashes, texts, roots):
                 if roots.split(a)[0] == roots.split(b)[0] or hashes[a] == hashes[b] or (a, b) in seen:
                     continue
                 seen.add((a, b))
-                if budget <= 0 or max(inv[a], inv[b]) > 5000:
+                if budget <= 0 or max(inv[a], inv[b]) > 5000 or a not in texts or b not in texts:
                     continue
                 budget -= 1
                 la, lb = texts[a].splitlines(), texts[b].splitlines()

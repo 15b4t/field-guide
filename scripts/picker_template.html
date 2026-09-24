@@ -172,7 +172,7 @@ details.nc{margin-top:24px;color:var(--muted);font-size:13px}
     const doneIds = new Set(data.slices.filter(s => s.status === 'done').map(s => s.id));
     const counts = {};
     data.slices.forEach(s => counts[s.status] = (counts[s.status] || 0) + 1);
-    const summary = Object.entries(counts).map(([a, b]) => `${b} ${a}`).join(' · ');
+    const summary = Object.entries(counts).map(([a, b]) => `${b} ${esc(a)}`).join(' · ');
 
     app.innerHTML = header(data.title,
       `<span class="mono">${esc(data.workspace)}</span> · depth ${esc(data.depth)} · research on ${esc(data.models.research)}, writing on ${esc(data.models.writer)} · ${summary}`) +
