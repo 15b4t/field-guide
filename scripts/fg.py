@@ -471,7 +471,10 @@ def workspace_warnings(d, plan):
 
 def cmd_init(args):
     d = args.dir
-    prev = load_json(os.path.join(d, WS_CONFIG))
+    cfg_path = os.path.join(d, WS_CONFIG)
+    # strict: this file is read, modified and written back below. Treating an unparseable one as
+    # absent would overwrite it with a fresh config and skip the re-scope guard that follows.
+    prev = load_json(cfg_path, strict=True)
     if prev and not args.force:
         # One workspace holds every volume, so re-scoping it in place is how a guide gets destroyed:
         # the planner writes a fresh slice list and the old chapters become unreachable.
@@ -487,8 +490,7 @@ def cmd_init(args):
                 f"  To re-scope this one anyway and orphan those chapters, add --force.")
     os.makedirs(os.path.join(d, "notes"), exist_ok=True)
     os.makedirs(os.path.join(d, "chapters"), exist_ok=True)
-    cfg_path = os.path.join(d, WS_CONFIG)
-    cfg = load_json(cfg_path) or {}
+    cfg = dict(prev or {})
     cfg[CONFIG_MARKER] = 1
     # The guide's definition is written explicitly into the committed file, so everyone who refreshes
     # it produces the same document regardless of their own user defaults.
@@ -565,7 +567,7 @@ def cmd_config(args):
     for target, kvs in edits.items():
         path = USER_CONFIG if target == "user" else os.path.join(
             d, WS_CONFIG if target == "workspace" else LOCAL_CONFIG)
-        cfg = load_json(path, {}) or {}
+        cfg = load_json(path, {}, strict=True) or {}
         for key, val in kvs:
             set_key(cfg, key, val)
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
@@ -1309,7 +1311,7 @@ def cmd_volume(args):
         v = find_volume(plan, args.id) or die(f"no volume {args.id!r}")
         # Widening the workspace scope is what makes the volume's code visible to map, measure and
         # the coverage page. Volumes share one scope so cross-volume references stay resolvable.
-        ws = load_json(os.path.join(d, WS_CONFIG), {}) or {}
+        ws = load_json(os.path.join(d, WS_CONFIG), {}, strict=True) or {}
         scope = list(ws.get("scope") or [])
         added = [p for p in v["paths"] if p not in scope]
         ws["scope"] = scope + added

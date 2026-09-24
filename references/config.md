@@ -16,8 +16,7 @@ Each layer overrides the ones above it. `null` in a layer means "not set here".
 `fg.py config` prints every resolved value with the layer it came from; `--json` prints the values
 alone. `--set key=value` edits one layer: personal keys go to local (or to user when there's no
 workspace), and guide keys go to workspace. `--user`, `--local` or `--workspace` overrides the choice,
-and `--set key=null` removes a key from a layer. Workspaces from before the rename (`config.json`,
-`config.local.json`) are renamed automatically the first time `fg.py` touches them.
+and `--set key=null` removes a key from a layer.
 
 ## Guide keys (workspace layer)
 
